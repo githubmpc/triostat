@@ -9,7 +9,7 @@ library(bindrcpp)
 # directory where CNPBayes and triostats is located
 setwd("/gpfs/data/chaklab/home/choum02")
 load_all("CNPBayes_trios")
-load_all("triostats")
+load_all("triostat")
 
 # directory where parameter files are located
 #setwd("/gpfs/data/chaklab/home/choum02/batchrun27")
