@@ -1,0 +1,950 @@
+---
+title: "Simulation Results"
+output: pdf_document
+classoption: landscape
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(devtools)
+library(tibble)
+library(magrittr)
+library(coda)
+setwd("~/Desktop/Chakravarti_Lab/git")
+#load_all("CNPBayes_trios")
+load_all("triostats")
+
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(tidyverse)
+library(gtools)
+library(splitstackshape)
+library(stringr)
+```
+
+## Simulation Overview
+
+Used 12 sets of parameters for simulation (shown in the table below) for a deletion region with CN 0, 1 , 2 and thetas (mean intensity) fixed at -3, 0.15, 1.2 respectively. Variance fixed at 0.2. The mixture proportions were varied between p=0.1 - 0.5 and the number of trios (N) fixed at 50, 100, 250 and 1000 for each set of variance parameters. These 12 parameters were replicated 1000x - a total of 2400 simulations were run.
+
+For these simulations, we also calculate a delta parameter that represents the Euclidean distance of the estimated simulation parameters from the fixed simulation parameters. 
+
+
+```{r params, echo=FALSE}
+params.table <- matrix(c(1:12), nrow=3, ncol=4, byrow=T,
+                       dimnames = list(c("p=0.5", "p=0.3", "p=0.1"),c("N=50", "N=100", "N=250", "N=1000")))
+params.table
+```
+
+\newpage
+### Model comparison at for different mixture proportions for the same N
+
+#### N = 50
+
+```{r read, echo=F, warning=F}
+setwd("~/Desktop/Chakravarti_Lab/Submissions/nov27.results/results.overlap98")
+
+file.no <- seq(1,2400, by=1)
+L <- length(file.no)
+results.list <- vector("list",L)
+results.list2 <- vector("list",L)
+
+for (i in 1:L){
+  ia <- file.no[i]
+  file.names <- paste0("params_",ia,".rds")
+  params.in <- readRDS(file.names)
+  data.read <-  simdata.read(params.in)
+  stables <- summarise_results(data.read)
+  #simresults <- overall_results(stables)
+  #results.list[[i]] <- simresults
+  simresults2 <- overall_results2(stables)
+  results.list[[i]] <- simresults2
+
+}
+
+#rtable <- output_results(results.list)
+rtable <- output_results2(results.list)
+rtable.expand <- rtable_plotprep(results.list, reps=200)
+
+leng <- length(results.list)
+# for p=0.5
+file.no1 <- seq(1,leng, by=12)
+
+# for p=0.3
+file.no2 <- seq(5,leng, by=12)
+
+# for p=0.1
+file.no3 <- seq(9,leng, by=12)
+file.no <- sort(c(file.no1, file.no2, file.no3))
+
+results.list1 <- results.list[file.no]
+results.list1a <- results.list[file.no1]
+results.list1b <- results.list[file.no2]
+results.list1c <- results.list[file.no3]
+
+rtable1 <- output_results2(results.list1)
+rtable1a <- output_results2(results.list1a)
+rtable1b <- output_results2(results.list1b)
+rtable1c <- output_results2(results.list1c)
+
+```
+
+#####What is the overall accuracy for N=50?
+
+```{r data1a, echo=F}
+
+rtable.overall <- rtable_overall(rtable1)
+#rtable.osmaller <- rtable_overalls(rtable1)
+kable(rtable.overall) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+#####What is the overall accuracy for N=50 by allele frequency?
+
+```{r data1b, echo=F}
+
+#rtable.af <- rtable_af(rtable1a, rtable1b, rtable1c)
+rtable.afs <- rtable_afs(rtable1a, rtable1b, rtable1c)
+kable(rtable.afs) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+  
+  
+\newpage
+#####What is the accuracy for N=50 by allele frequency stratified by whether parents were genotyped correctly?
+
+
+```{r data1c, echo=F}
+
+#rtable.pc <- rtable_pc(rtable1a, rtable1b, rtable1c)
+rtable.pcs <- rtable_pcs(rtable1a, rtable1b, rtable1c)
+kable(rtable.pcs, caption = "Parents Correct") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+#rtable.pic <- rtable_pic(rtable1a, rtable1b, rtable1c)
+rtable.pics <- rtable_pics(rtable1a, rtable1b, rtable1c)
+kable(rtable.pics, caption = "Parents Incorrect") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+  
+  
+\newpage
+#####What is the accuracy for N=50 by specific parental genotype?
+
+
+```{r data1d, echo=F}
+
+rtable.geno1 <- rtable_geno(rtable1a)
+rtable.geno2 <- rtable_geno(rtable1b)
+rtable.geno3 <- rtable_geno(rtable1c)
+
+kable(rtable.geno1, caption = "p=0.5") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+kable(rtable.geno2, caption = "p=0.3") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+kable(rtable.geno3, caption = "p=0.1") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+\newpage  
+#####Comparison of Overall Child Accuracy?
+
+
+```{r comparison 1, echo=FALSE, warning=FALSE}
+
+rtable.accur <- rtable.expand %>% 
+  filter(geno=="all") %>%
+  filter(size.labels=="N50")
+ggplot(rtable.accur, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=af.labels)) + geom_abline(intercept=0) + xlim(0.5,1) + ylim(0.5,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Overall Child Accuracy")
+```
+  
+  
+\newpage
+#####What does the data look like across the replicates (boxplot)?
+
+```{r plots 1a, echo=FALSE, warning=FALSE, fig.align='center'}
+rtable.box <- rtable.expand %>%
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(size.labels=="N50")
+ggplot(rtable.box, aes(geno, accuracy.trio)) + geom_boxplot(aes(colour=geno)) + theme_bw() + theme(
+    plot.background = element_blank()
+   #,panel.grid.major = element_blank()
+   #,panel.grid.minor = element_blank()
+   #,panel.border = element_blank()
+  ) + #+ ylim(0.8,1) #+ xlim(0, 0.6) 
+facet_grid( ~ af.labels) + xlab("genotype") + ylab("Accuracy (child/trio)") + ggtitle("Boxplot of Child Accuracy by CN genotype")
+
+```
+
+  
+\newpage
+#####Comparison of Child Accuracy by CN Genotype?
+
+```{r plots 1b, echo=FALSE, warning=FALSE, fig.align='center'}
+
+rtable.cng5 <- rtable.expand %>%
+  filter(size.labels=="N50") %>% 
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(rowname=="cn2" | rowname=="cn1" | rowname=="cn0") %>%
+  filter(af.labels=="p=0.5")
+rtable.cng3 <- rtable.expand %>%
+  filter(size.labels=="N50") %>% 
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(rowname=="cn2" | rowname=="cn1" | rowname=="cn0") %>%
+  filter(af.labels=="p=0.3")
+rtable.cng1 <- rtable.expand %>%
+  filter(size.labels=="N50") %>% 
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(rowname=="cn2" | rowname=="cn1" | rowname=="cn0") %>%
+  filter(af.labels=="p=0.1")
+
+ggplot(rtable.cng5, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.5)")
+
+ggplot(rtable.cng3, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.3)")
+
+ggplot(rtable.cng1, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.1)")
+
+
+```
+  
+  
+\newpage  
+#####Comparison of Child Accuracy by CN Genotype and Parental Correctness?
+
+```{r plots 1c, echo=FALSE, warning=FALSE, fig.align='center'}
+
+rtable.cng5pc <- rtable.expand %>%
+  filter(size.labels=="N50") %>%
+  filter(rowname=="parents.correct.cn2" | rowname=="parents.correct.cn1"| rowname=="parents.correct.cn0") %>%
+  filter(af.labels=="p=0.5")
+rtable.cng3pc <- rtable.expand %>%
+  filter(size.labels=="N50") %>%
+  filter(rowname=="parents.correct.cn2" | rowname=="parents.correct.cn1"| rowname=="parents.correct.cn0") %>%
+  filter(af.labels=="p=0.3")
+rtable.cng1pc <- rtable.expand %>%
+  filter(size.labels=="N50") %>%
+  filter(rowname=="parents.correct.cn2" | rowname=="parents.correct.cn1"| rowname=="parents.correct.cn0") %>%
+  filter(af.labels=="p=0.1")
+
+ggplot(rtable.cng5pc, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.5, parents correct)")
+
+ggplot(rtable.cng3pc, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.3, parents correct)")
+
+ggplot(rtable.cng1pc, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.1, parents correct)")
+
+```
+  
+
+```{r plots 1d, echo=FALSE, warning=FALSE, fig.align='center'}
+rtable.cng5pic <- rtable.expand %>%
+  filter(size.labels=="N50") %>%
+  filter(rowname=="parents.incorrect.cn2" | rowname=="parents.incorrect.cn1"| rowname=="parents.incorrect.cn0") %>%
+  filter(af.labels=="p=0.5")
+rtable.cng3pic <- rtable.expand  %>%
+  filter(size.labels=="N50") %>%
+  filter(rowname=="parents.incorrect.cn2" | rowname=="parents.incorrect.cn1"| rowname=="parents.incorrect.cn0") %>%
+  filter(af.labels=="p=0.3")
+rtable.cng1pic <- rtable.expand %>%
+  filter(size.labels=="N50") %>%
+  filter(rowname=="parents.incorrect.cn2" | rowname=="parents.incorrect.cn1"| rowname=="parents.incorrect.cn0") %>%
+  filter(af.labels=="p=0.1")
+
+ggplot(rtable.cng5pic, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.5, parents incorrect)")
+
+ggplot(rtable.cng3pic, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.3, parents incorrect)")
+
+ggplot(rtable.cng1pic, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.1, parents incorrect)")
+
+```
+  
+
+```{r plot 1e, echo=F, warning=FALSE, fig.width=9, fig.height=6, fig.align="center"}
+rtable.sg <- rtable_sg(rtable.expand)
+rtable.sg$sgeno <- str_sub(rtable.sg$rowname,1, 7)
+
+rtable.sg5 <- rtable.sg %>%
+  filter(size.labels=="N50") %>%
+  filter(af.labels=="p=0.5")
+
+rtable.sg3 <- rtable.sg %>%
+  filter(size.labels=="N50") %>%
+  filter(af.labels=="p=0.5")
+
+rtable.sg1 <- rtable.sg %>%
+  filter(size.labels=="N50") %>%
+  filter(af.labels=="p=0.5")
+
+ggplot(rtable.sg5, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Trio Accuracy (Child)") + xlab("Independent Accuracy (Child)") + ggtitle("Child Accuracy by specific parental genotype for p=0.5") + facet_wrap(~sgeno)
+
+ggplot(rtable.sg3, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Trio Accuracy (Child)") + xlab("Independent Accuracy (Child)") + ggtitle("Child Accuracy by specific parental genotype for p=0.3") + facet_wrap(~sgeno)
+
+ggplot(rtable.sg1, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Trio Accuracy (Child)") + xlab("Independent Accuracy (Child)") + ggtitle("Child Accuracy by specific parental genotype for p=0.1") + facet_wrap(~sgeno)
+
+```
+  
+
+\newpage
+#### N=100
+
+```{r n2, echo=FALSE}
+file.no1 <- seq(2,leng, by=12)
+file.no2 <- seq(6,leng, by=12)
+file.no3 <- seq(10,leng, by=12)
+file.no <- sort(c(file.no1, file.no2, file.no3))
+
+results.list1 <- results.list[file.no]
+results.list1a <- results.list[file.no1]
+results.list1b <- results.list[file.no2]
+results.list1c <- results.list[file.no3]
+
+rtable1 <- output_results2(results.list1)
+rtable1a <- output_results2(results.list1a)
+rtable1b <- output_results2(results.list1b)
+rtable1c <- output_results2(results.list1c)
+```
+
+
+#####What is the overall accuracy for N=100?
+
+```{r data2a, echo=F}
+
+rtable.overall <- rtable_overall(rtable1)
+#rtable.osmaller <- rtable_overalls(rtable1)
+kable(rtable.overall) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+#####What is the overall accuracy for N=100 by allele frequency?
+
+```{r data2b, echo=F}
+
+#rtable.af <- rtable_af(rtable1a, rtable1b, rtable1c)
+rtable.afs <- rtable_afs(rtable1a, rtable1b, rtable1c)
+kable(rtable.afs) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+  
+  
+\newpage
+#####What is the accuracy for N=100 by allele frequency stratified by whether parents were genotyped correctly?
+
+
+```{r data2c, echo=F}
+
+#rtable.pc <- rtable_pc(rtable1a, rtable1b, rtable1c)
+rtable.pcs <- rtable_pcs(rtable1a, rtable1b, rtable1c)
+kable(rtable.pcs, caption = "Parents Correct") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+#rtable.pic <- rtable_pic(rtable1a, rtable1b, rtable1c)
+rtable.pics <- rtable_pics(rtable1a, rtable1b, rtable1c)
+kable(rtable.pics, caption = "Parents Incorrect") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+  
+  
+\newpage
+#####What is the accuracy for N=100 by specific parental genotype?
+
+
+```{r data2d, echo=F}
+
+rtable.geno1 <- rtable_geno(rtable1a)
+rtable.geno2 <- rtable_geno(rtable1b)
+rtable.geno3 <- rtable_geno(rtable1c)
+
+kable(rtable.geno1, caption = "p=0.5") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+kable(rtable.geno2, caption = "p=0.3") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+kable(rtable.geno3, caption = "p=0.1") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+\newpage  
+#####Comparison of Overall Child Accuracy?
+
+
+```{r comparison 2, echo=FALSE, warning=FALSE}
+
+rtable.accur <- rtable.expand %>% 
+  filter(geno=="all") %>%
+  filter(size.labels=="N100")
+ggplot(rtable.accur, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=af.labels)) + geom_abline(intercept=0) + xlim(0.5,1) + ylim(0.5,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Overall Child Accuracy")
+```
+  
+  
+\newpage
+#####What does the data look like across the replicates (boxplot)?
+
+```{r plots 2a, echo=FALSE, warning=FALSE, fig.align='center'}
+rtable.box <- rtable.expand %>%
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(size.labels=="N100")
+ggplot(rtable.box, aes(geno, accuracy.trio)) + geom_boxplot(aes(colour=geno)) + theme_bw() + theme(
+    plot.background = element_blank()
+   #,panel.grid.major = element_blank()
+   #,panel.grid.minor = element_blank()
+   #,panel.border = element_blank()
+  ) + #+ ylim(0.8,1) #+ xlim(0, 0.6) 
+facet_grid( ~ af.labels) + xlab("genotype") + ylab("Accuracy (child/trio)") + ggtitle("Boxplot of Child Accuracy by CN genotype")
+
+```
+
+  
+\newpage
+#####Comparison of Child Accuracy by CN Genotype?
+
+```{r plots 2b, echo=FALSE, warning=FALSE, fig.align='center'}
+
+rtable.cng5 <- rtable.expand %>%
+  filter(size.labels=="N100") %>% 
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(rowname=="cn2" | rowname=="cn1" | rowname=="cn0") %>%
+  filter(af.labels=="p=0.5")
+rtable.cng3 <- rtable.expand %>%
+  filter(size.labels=="N100") %>% 
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(rowname=="cn2" | rowname=="cn1" | rowname=="cn0") %>%
+  filter(af.labels=="p=0.3")
+rtable.cng1 <- rtable.expand %>%
+  filter(size.labels=="N100") %>% 
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(rowname=="cn2" | rowname=="cn1" | rowname=="cn0") %>%
+  filter(af.labels=="p=0.1")
+
+ggplot(rtable.cng5, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.5)")
+
+ggplot(rtable.cng3, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.3)")
+
+ggplot(rtable.cng1, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.1)")
+
+
+```
+  
+  
+\newpage  
+#####Comparison of Child Accuracy by CN Genotype and Parental Correctness?
+
+```{r plots 2c, echo=FALSE, warning=FALSE, fig.align='center'}
+
+rtable.cng5pc <- rtable.expand %>%
+  filter(size.labels=="N100") %>%
+  filter(rowname=="parents.correct.cn2" | rowname=="parents.correct.cn1"| rowname=="parents.correct.cn0") %>%
+  filter(af.labels=="p=0.5")
+rtable.cng3pc <- rtable.expand %>%
+  filter(size.labels=="N100") %>%
+  filter(rowname=="parents.correct.cn2" | rowname=="parents.correct.cn1"| rowname=="parents.correct.cn0") %>%
+  filter(af.labels=="p=0.3")
+rtable.cng1pc <- rtable.expand %>%
+  filter(size.labels=="N100") %>%
+  filter(rowname=="parents.correct.cn2" | rowname=="parents.correct.cn1"| rowname=="parents.correct.cn0") %>%
+  filter(af.labels=="p=0.1")
+
+ggplot(rtable.cng5pc, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.5, parents correct)")
+
+ggplot(rtable.cng3pc, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.3, parents correct)")
+
+ggplot(rtable.cng1pc, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.1, parents correct)")
+
+```
+  
+
+```{r plots 2d, echo=FALSE, warning=FALSE, fig.align='center'}
+rtable.cng5pic <- rtable.expand %>%
+  filter(size.labels=="N100") %>%
+  filter(rowname=="parents.incorrect.cn2" | rowname=="parents.incorrect.cn1"| rowname=="parents.incorrect.cn0") %>%
+  filter(af.labels=="p=0.5")
+rtable.cng3pic <- rtable.expand  %>%
+  filter(size.labels=="N100") %>%
+  filter(rowname=="parents.incorrect.cn2" | rowname=="parents.incorrect.cn1"| rowname=="parents.incorrect.cn0") %>%
+  filter(af.labels=="p=0.3")
+rtable.cng1pic <- rtable.expand %>%
+  filter(size.labels=="N100") %>%
+  filter(rowname=="parents.incorrect.cn2" | rowname=="parents.incorrect.cn1"| rowname=="parents.incorrect.cn0") %>%
+  filter(af.labels=="p=0.1")
+
+ggplot(rtable.cng5pic, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.5, parents incorrect)")
+
+ggplot(rtable.cng3pic, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.3, parents incorrect)")
+
+ggplot(rtable.cng1pic, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.1, parents incorrect)")
+
+```
+  
+
+```{r plot 2e, echo=F, warning=FALSE, fig.width=9, fig.height=6, fig.align="center"}
+rtable.sg <- rtable_sg(rtable.expand)
+rtable.sg$sgeno <- str_sub(rtable.sg$rowname,1, 7)
+
+rtable.sg5 <- rtable.sg %>%
+  filter(size.labels=="N100") %>%
+  filter(af.labels=="p=0.5")
+
+rtable.sg3 <- rtable.sg %>%
+  filter(size.labels=="N100") %>%
+  filter(af.labels=="p=0.5")
+
+rtable.sg1 <- rtable.sg %>%
+  filter(size.labels=="N100") %>%
+  filter(af.labels=="p=0.5")
+
+ggplot(rtable.sg5, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Trio Accuracy (Child)") + xlab("Independent Accuracy (Child)") + ggtitle("Child Accuracy by specific parental genotype for p=0.5") + facet_wrap(~sgeno)
+
+ggplot(rtable.sg3, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Trio Accuracy (Child)") + xlab("Independent Accuracy (Child)") + ggtitle("Child Accuracy by specific parental genotype for p=0.3") + facet_wrap(~sgeno)
+
+ggplot(rtable.sg1, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Trio Accuracy (Child)") + xlab("Independent Accuracy (Child)") + ggtitle("Child Accuracy by specific parental genotype for p=0.1") + facet_wrap(~sgeno)
+
+```
+  
+\newpage
+#### N=250
+
+```{r n3, echo=FALSE}
+file.no1 <- seq(3,leng, by=12)
+file.no2 <- seq(7,leng, by=12)
+file.no3 <- seq(11,leng, by=12)
+file.no <- sort(c(file.no1, file.no2, file.no3))
+
+results.list1 <- results.list[file.no]
+results.list1a <- results.list[file.no1]
+results.list1b <- results.list[file.no2]
+results.list1c <- results.list[file.no3]
+
+rtable1 <- output_results2(results.list1)
+rtable1a <- output_results2(results.list1a)
+rtable1b <- output_results2(results.list1b)
+rtable1c <- output_results2(results.list1c)
+```
+
+
+#####What is the overall accuracy for N=250?
+
+```{r data3a, echo=F}
+
+rtable.overall <- rtable_overall(rtable1)
+#rtable.osmaller <- rtable_overalls(rtable1)
+kable(rtable.overall) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+#####What is the overall accuracy for N=250 by allele frequency?
+
+```{r data3b, echo=F}
+
+#rtable.af <- rtable_af(rtable1a, rtable1b, rtable1c)
+rtable.afs <- rtable_afs(rtable1a, rtable1b, rtable1c)
+kable(rtable.afs) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+  
+  
+\newpage
+#####What is the accuracy for N=250 by allele frequency stratified by whether parents were genotyped correctly?
+
+
+```{r data3c, echo=F}
+
+#rtable.pc <- rtable_pc(rtable1a, rtable1b, rtable1c)
+rtable.pcs <- rtable_pcs(rtable1a, rtable1b, rtable1c)
+kable(rtable.pcs, caption = "Parents Correct") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+#rtable.pic <- rtable_pic(rtable1a, rtable1b, rtable1c)
+rtable.pics <- rtable_pics(rtable1a, rtable1b, rtable1c)
+kable(rtable.pics, caption = "Parents Incorrect") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+  
+  
+\newpage
+#####What is the accuracy for N=250 by specific parental genotype?
+
+
+```{r data3d, echo=F}
+
+rtable.geno1 <- rtable_geno(rtable1a)
+rtable.geno2 <- rtable_geno(rtable1b)
+rtable.geno3 <- rtable_geno(rtable1c)
+
+kable(rtable.geno1, caption = "p=0.5") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+kable(rtable.geno2, caption = "p=0.3") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+kable(rtable.geno3, caption = "p=0.1") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+\newpage  
+#####Comparison of Overall Child Accuracy?
+
+
+```{r comparison 3, echo=FALSE, warning=FALSE}
+
+rtable.accur <- rtable.expand %>% 
+  filter(geno=="all") %>%
+  filter(size.labels=="N250")
+ggplot(rtable.accur, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=af.labels)) + geom_abline(intercept=0) + xlim(0.5,1) + ylim(0.5,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Overall Child Accuracy")
+```
+  
+  
+\newpage
+#####What does the data look like across the replicates (boxplot)?
+
+```{r plots 3a, echo=FALSE, warning=FALSE, fig.align='center'}
+rtable.box <- rtable.expand %>%
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(size.labels=="N250")
+ggplot(rtable.box, aes(geno, accuracy.trio)) + geom_boxplot(aes(colour=geno)) + theme_bw() + theme(
+    plot.background = element_blank()
+   #,panel.grid.major = element_blank()
+   #,panel.grid.minor = element_blank()
+   #,panel.border = element_blank()
+  ) + #+ ylim(0.8,1) #+ xlim(0, 0.6) 
+facet_grid( ~ af.labels) + xlab("genotype") + ylab("Accuracy (child/trio)") + ggtitle("Boxplot of Child Accuracy by CN genotype")
+
+```
+
+  
+\newpage
+#####Comparison of Child Accuracy by CN Genotype?
+
+```{r plots 3b, echo=FALSE, warning=FALSE, fig.align='center'}
+
+rtable.cng5 <- rtable.expand %>%
+  filter(size.labels=="N250") %>% 
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(rowname=="cn2" | rowname=="cn1" | rowname=="cn0") %>%
+  filter(af.labels=="p=0.5")
+rtable.cng3 <- rtable.expand %>%
+  filter(size.labels=="N250") %>% 
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(rowname=="cn2" | rowname=="cn1" | rowname=="cn0") %>%
+  filter(af.labels=="p=0.3")
+rtable.cng1 <- rtable.expand %>%
+  filter(size.labels=="N250") %>% 
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(rowname=="cn2" | rowname=="cn1" | rowname=="cn0") %>%
+  filter(af.labels=="p=0.1")
+
+ggplot(rtable.cng5, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.5)")
+
+ggplot(rtable.cng3, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.3)")
+
+ggplot(rtable.cng1, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.1)")
+
+
+```
+  
+  
+\newpage  
+#####Comparison of Child Accuracy by CN Genotype and Parental Correctness?
+
+```{r plots 3c, echo=FALSE, warning=FALSE, fig.align='center'}
+
+rtable.cng5pc <- rtable.expand %>%
+  filter(size.labels=="N250") %>%
+  filter(rowname=="parents.correct.cn2" | rowname=="parents.correct.cn1"| rowname=="parents.correct.cn0") %>%
+  filter(af.labels=="p=0.5")
+rtable.cng3pc <- rtable.expand %>%
+  filter(size.labels=="N250") %>%
+  filter(rowname=="parents.correct.cn2" | rowname=="parents.correct.cn1"| rowname=="parents.correct.cn0") %>%
+  filter(af.labels=="p=0.3")
+rtable.cng1pc <- rtable.expand %>%
+  filter(size.labels=="N250") %>%
+  filter(rowname=="parents.correct.cn2" | rowname=="parents.correct.cn1"| rowname=="parents.correct.cn0") %>%
+  filter(af.labels=="p=0.1")
+
+ggplot(rtable.cng5pc, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.5, parents correct)")
+
+ggplot(rtable.cng3pc, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.3, parents correct)")
+
+ggplot(rtable.cng1pc, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.1, parents correct)")
+
+```
+  
+
+```{r plots 3d, echo=FALSE, warning=FALSE, fig.align='center'}
+rtable.cng5pic <- rtable.expand %>%
+  filter(size.labels=="N250") %>%
+  filter(rowname=="parents.incorrect.cn2" | rowname=="parents.incorrect.cn1"| rowname=="parents.incorrect.cn0") %>%
+  filter(af.labels=="p=0.5")
+rtable.cng3pic <- rtable.expand  %>%
+  filter(size.labels=="N250") %>%
+  filter(rowname=="parents.incorrect.cn2" | rowname=="parents.incorrect.cn1"| rowname=="parents.incorrect.cn0") %>%
+  filter(af.labels=="p=0.3")
+rtable.cng1pic <- rtable.expand %>%
+  filter(size.labels=="N250") %>%
+  filter(rowname=="parents.incorrect.cn2" | rowname=="parents.incorrect.cn1"| rowname=="parents.incorrect.cn0") %>%
+  filter(af.labels=="p=0.1")
+
+ggplot(rtable.cng5pic, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.5, parents incorrect)")
+
+ggplot(rtable.cng3pic, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.3, parents incorrect)")
+
+ggplot(rtable.cng1pic, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.1, parents incorrect)")
+
+```
+  
+
+```{r plot 3e, echo=F, warning=FALSE, fig.width=9, fig.height=6, fig.align="center"}
+rtable.sg <- rtable_sg(rtable.expand)
+rtable.sg$sgeno <- str_sub(rtable.sg$rowname,1, 7)
+
+rtable.sg5 <- rtable.sg %>%
+  filter(size.labels=="N250") %>%
+  filter(af.labels=="p=0.5")
+
+rtable.sg3 <- rtable.sg %>%
+  filter(size.labels=="N250") %>%
+  filter(af.labels=="p=0.5")
+
+rtable.sg1 <- rtable.sg %>%
+  filter(size.labels=="N250") %>%
+  filter(af.labels=="p=0.5")
+
+ggplot(rtable.sg5, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Trio Accuracy (Child)") + xlab("Independent Accuracy (Child)") + ggtitle("Child Accuracy by specific parental genotype for p=0.5") + facet_wrap(~sgeno)
+
+ggplot(rtable.sg3, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Trio Accuracy (Child)") + xlab("Independent Accuracy (Child)") + ggtitle("Child Accuracy by specific parental genotype for p=0.3") + facet_wrap(~sgeno)
+
+ggplot(rtable.sg1, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Trio Accuracy (Child)") + xlab("Independent Accuracy (Child)") + ggtitle("Child Accuracy by specific parental genotype for p=0.1") + facet_wrap(~sgeno)
+
+```
+  
+\newpage
+#### N=1000
+
+```{r n4, echo=FALSE}
+# for p=0.5
+file.no1 <- seq(4,leng, by=12)
+
+# for p=0.3
+file.no2 <- seq(8,leng, by=12)
+
+# for p=0.1
+file.no3 <- seq(12,leng, by=12)
+file.no <- sort(c(file.no1, file.no2, file.no3))
+results.list1 <- results.list[file.no]
+results.list1a <- results.list[file.no1]
+results.list1b <- results.list[file.no2]
+results.list1c <- results.list[file.no3]
+
+rtable1 <- output_results2(results.list1)
+rtable1a <- output_results2(results.list1a)
+rtable1b <- output_results2(results.list1b)
+rtable1c <- output_results2(results.list1c)
+```
+
+
+#####What is the overall accuracy for N=1000?
+
+```{r data4a, echo=F}
+
+rtable.overall <- rtable_overall(rtable1)
+#rtable.osmaller <- rtable_overalls(rtable1)
+kable(rtable.overall) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+#####What is the overall accuracy for N=1000 by allele frequency?
+
+```{r data4b, echo=F}
+
+#rtable.af <- rtable_af(rtable1a, rtable1b, rtable1c)
+rtable.afs <- rtable_afs(rtable1a, rtable1b, rtable1c)
+kable(rtable.afs) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+  
+  
+\newpage
+#####What is the accuracy for N=1000 by allele frequency stratified by whether parents were genotyped correctly?
+
+
+```{r data4c, echo=F}
+
+#rtable.pc <- rtable_pc(rtable1a, rtable1b, rtable1c)
+rtable.pcs <- rtable_pcs(rtable1a, rtable1b, rtable1c)
+kable(rtable.pcs, caption = "Parents Correct") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+#rtable.pic <- rtable_pic(rtable1a, rtable1b, rtable1c)
+rtable.pics <- rtable_pics(rtable1a, rtable1b, rtable1c)
+kable(rtable.pics, caption = "Parents Incorrect") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+  
+  
+\newpage
+#####What is the accuracy for N=1000 by specific parental genotype?
+
+
+```{r data4d, echo=F}
+
+rtable.geno1 <- rtable_geno(rtable1a)
+rtable.geno2 <- rtable_geno(rtable1b)
+rtable.geno3 <- rtable_geno(rtable1c)
+
+kable(rtable.geno1, caption = "p=0.5") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+kable(rtable.geno2, caption = "p=0.3") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+kable(rtable.geno3, caption = "p=0.1") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+\newpage  
+#####Comparison of Overall Child Accuracy?
+
+
+```{r comparison 4, echo=FALSE, warning=FALSE}
+
+rtable.accur <- rtable.expand %>% 
+  filter(geno=="all") %>%
+  filter(size.labels=="N1000")
+ggplot(rtable.accur, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=af.labels)) + geom_abline(intercept=0) + xlim(0.5,1) + ylim(0.5,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Overall Child Accuracy")
+```
+  
+  
+\newpage
+#####What does the data look like across the replicates (boxplot)?
+
+```{r plots 4a, echo=FALSE, warning=FALSE, fig.align='center'}
+rtable.box <- rtable.expand %>%
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(size.labels=="N1000")
+ggplot(rtable.box, aes(geno, accuracy.trio)) + geom_boxplot(aes(colour=geno)) + theme_bw() + theme(
+    plot.background = element_blank()
+   #,panel.grid.major = element_blank()
+   #,panel.grid.minor = element_blank()
+   #,panel.border = element_blank()
+  ) + #+ ylim(0.8,1) #+ xlim(0, 0.6) 
+facet_grid( ~ af.labels) + xlab("genotype") + ylab("Accuracy (child/trio)") + ggtitle("Boxplot of Child Accuracy by CN genotype")
+
+```
+
+  
+\newpage
+#####Comparison of Child Accuracy by CN Genotype?
+
+```{r plots 4b, echo=FALSE, warning=FALSE, fig.align='center'}
+
+rtable.cng5 <- rtable.expand %>%
+  filter(size.labels=="N1000") %>% 
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(rowname=="cn2" | rowname=="cn1" | rowname=="cn0") %>%
+  filter(af.labels=="p=0.5")
+rtable.cng3 <- rtable.expand %>%
+  filter(size.labels=="N1000") %>% 
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(rowname=="cn2" | rowname=="cn1" | rowname=="cn0") %>%
+  filter(af.labels=="p=0.3")
+rtable.cng1 <- rtable.expand %>%
+  filter(size.labels=="N1000") %>% 
+  filter(geno=="cn2" | geno=="cn1" | geno=="cn0") %>%
+  filter(rowname=="cn2" | rowname=="cn1" | rowname=="cn0") %>%
+  filter(af.labels=="p=0.1")
+
+ggplot(rtable.cng5, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.5)")
+
+ggplot(rtable.cng3, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.3)")
+
+ggplot(rtable.cng1, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.1)")
+
+
+```
+  
+  
+\newpage  
+#####Comparison of Child Accuracy by CN Genotype and Parental Correctness?
+
+```{r plots 4c, echo=FALSE, warning=FALSE, fig.align='center'}
+
+rtable.cng5pc <- rtable.expand %>%
+  filter(size.labels=="N1000") %>%
+  filter(rowname=="parents.correct.cn2" | rowname=="parents.correct.cn1"| rowname=="parents.correct.cn0") %>%
+  filter(af.labels=="p=0.5")
+rtable.cng3pc <- rtable.expand %>%
+  filter(size.labels=="N1000") %>%
+  filter(rowname=="parents.correct.cn2" | rowname=="parents.correct.cn1"| rowname=="parents.correct.cn0") %>%
+  filter(af.labels=="p=0.3")
+rtable.cng1pc <- rtable.expand %>%
+  filter(size.labels=="N1000") %>%
+  filter(rowname=="parents.correct.cn2" | rowname=="parents.correct.cn1"| rowname=="parents.correct.cn0") %>%
+  filter(af.labels=="p=0.1")
+
+ggplot(rtable.cng5pc, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.5, parents correct)")
+
+ggplot(rtable.cng3pc, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.3, parents correct)")
+
+ggplot(rtable.cng1pc, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.1, parents correct)")
+
+```
+  
+
+```{r plots 4d, echo=FALSE, warning=FALSE, fig.align='center'}
+rtable.cng5pic <- rtable.expand %>%
+  filter(size.labels=="N1000") %>%
+  filter(rowname=="parents.incorrect.cn2" | rowname=="parents.incorrect.cn1"| rowname=="parents.incorrect.cn0") %>%
+  filter(af.labels=="p=0.5")
+rtable.cng3pic <- rtable.expand  %>%
+  filter(size.labels=="N1000") %>%
+  filter(rowname=="parents.incorrect.cn2" | rowname=="parents.incorrect.cn1"| rowname=="parents.incorrect.cn0") %>%
+  filter(af.labels=="p=0.3")
+rtable.cng1pic <- rtable.expand %>%
+  filter(size.labels=="N1000") %>%
+  filter(rowname=="parents.incorrect.cn2" | rowname=="parents.incorrect.cn1"| rowname=="parents.incorrect.cn0") %>%
+  filter(af.labels=="p=0.1")
+
+ggplot(rtable.cng5pic, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.5, parents incorrect)")
+
+ggplot(rtable.cng3pic, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.3, parents incorrect)")
+
+ggplot(rtable.cng1pic, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Child Accuracy") + xlab("Independent Accuracy") + ggtitle("Child Accuracy by Genotype (p=0.1, parents incorrect)")
+
+```
+  
+
+```{r plot 4e, echo=F, warning=FALSE, fig.width=9, fig.height=6, fig.align="center"}
+rtable.sg <- rtable_sg(rtable.expand)
+rtable.sg$sgeno <- str_sub(rtable.sg$rowname,1, 7)
+
+rtable.sg5 <- rtable.sg %>%
+  filter(size.labels=="N1000") %>%
+  filter(af.labels=="p=0.5")
+
+rtable.sg3 <- rtable.sg %>%
+  filter(size.labels=="N1000") %>%
+  filter(af.labels=="p=0.5")
+
+rtable.sg1 <- rtable.sg %>%
+  filter(size.labels=="N1000") %>%
+  filter(af.labels=="p=0.5")
+
+ggplot(rtable.sg5, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Trio Accuracy (Child)") + xlab("Independent Accuracy (Child)") + ggtitle("Child Accuracy by specific parental genotype for p=0.5") + facet_wrap(~sgeno)
+
+ggplot(rtable.sg3, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Trio Accuracy (Child)") + xlab("Independent Accuracy (Child)") + ggtitle("Child Accuracy by specific parental genotype for p=0.3") + facet_wrap(~sgeno)
+
+ggplot(rtable.sg1, aes(accuracy.ind, accuracy.trio)) + geom_jitter(aes(colour=geno)) + geom_abline(intercept=0) + xlim(0,1) + ylim(0,1) + ylab("Trio Accuracy (Child)") + xlab("Independent Accuracy (Child)") + ggtitle("Child Accuracy by specific parental genotype for p=0.1") + facet_wrap(~sgeno)
+
+```
+  
