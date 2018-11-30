@@ -23,7 +23,7 @@ sum.fit <- function(model, truth, maplabel){
   cn_offspring <- truth$data$copy_number[is_offspring]
 
   results <- z2cn(model[[1]], maplabel)
-  is_offspring <- model[[1]]@triodata$family_member=="o"
+
   cn.truth <- truth$data$copy_number
   cn.truth.parent <- cn.truth[!is_offspring]
   cn.truth.child <- cn.truth[is_offspring]

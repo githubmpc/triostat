@@ -1,5 +1,3 @@
-#! /usr/bin/env Rscript
-
 library(devtools)
 #library(Rcpp)
 library(coda)
@@ -11,30 +9,14 @@ setwd("/gpfs/data/chaklab/home/choum02")
 load_all("CNPBayes_trios")
 load_all("triostat")
 
-# directory where parameter files are located
-#setwd("/gpfs/data/chaklab/home/choum02/batchrun27")
-#setwd("~/Desktop/Chakravarti_Lab/git/testing scripts/reproducible.example")
-setwd("~/Desktop/Chakravarti_Lab/git/triostat/reproducible.example")
+p <- c(0.09, 0.42, 0.49)
+theta <- c(-3,0.15, 1.2)
+sigma2 <- c(0.2, 0.2, 0.2)
+N <- 1000
+params <- data.frame(cbind(p, theta, sigma2))
 
-# choose your parameter file
-params.all <- readRDS("sim.params.orig.rds")
-
-
-# commandArgs specified as array in batch script
-ab <- commandArgs(trailingOnly=TRUE)  %>%
-  as.integer
-ab <- ab
-
-#seeds <- readRDS(file.path("./params_del", "params_seeds.rds"))
-seeds <- readRDS("params_seeds.orig.rds")
-seed <- seeds[ab]
+seed <- 4990917
 set.seed(seed)
-
-##--------------------------------------------------
-##
-message("cnpbayes_trios")
-##
-##--------------------------------------------------
 
 # note maplabel and hp defined manually here for now
 maplabel <- c(0,1,2)
@@ -42,10 +24,14 @@ k <- length(maplabel)
 hp <- HyperparametersTrios(k = 3)
 nbatch <- 1
 
-truth <- simulateData(params.all, ab, maplabel, nbatch)
+truth <- simulate_data_multi2(params, N=N,
+                              batches = rep(c(1:nbatch),
+                              length.out = 3*N),
+                              error=0, mprob, maplabel)
 
 mp <- McmcParams(iter=1500, burnin=1500, thin=1, nStarts=3)
 mprob <- mprob.matrix(tau=c(0.5, 0.5, 0.5), maplabel, error=0)
+
 model <- gibbs_trios(model="TBM", dat=as.tibble(truth$data),
                      batches=truth$data$batches,
                      mp=mp, mprob=mprob, maplabel=maplabel,
@@ -58,10 +44,10 @@ mb2 <- gibbs(model="MB", dat=truth$data$log_ratio,
                             k_range=c(3, 3),
                             max_burnin=6000)
 
-#mb2 <- gibbs(model="MB", dat=truth$data$log_ratio,
-#             batches=rep(c(1:nbatch),
-#                         length.out = 3*N),
-#             mp=mp, k_range=c(k, k), max_burnin=2000)
+ggMixture(model[[1]])
+ggChains(model[[1]])
+ggMixture(mb2[[1]])
+ggChains(mb2[[1]])
 
 trio.results <- sum.fit(model, truth, maplabel)
 mb.results <- sum.fit(mb2, truth, maplabel)
@@ -107,10 +93,7 @@ summaryResults <- list(params = params,
                        ModelSigma2 = model[[1]]@modes$sigma2
 )
 
-## save to some output directory
-pathout <- file.path("/gpfs/data/chaklab/home/choum02/batchrun27/results")
-#pathout <- file.path("~/Desktop/Chakravarti_Lab/git")
-results.out <- paste0("params_", ab, ".rds")
-#saveRDS(summary.results, file=file.path(pathout, params.rds))
-setwd("/gpfs/data/chaklab/home/choum02/batchrun27/results")
-saveRDS(summaryResults, file=file.path(pathout, results.out))
+data.read <-  simdata.read(summaryResults)
+stables <- summarise_results(data.read)
+simresults2 <- overall_results2(stables)
+simresults2

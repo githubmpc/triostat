@@ -45,7 +45,7 @@ params.table
 #### N = 50
 
 ```{r read, echo=F, warning=F}
-setwd("~/Desktop/Chakravarti_Lab/Submissions/nov27.results/results.overlap98")
+setwd("~/Desktop/Chakravarti_Lab/Submissions/nov27.results/results.origseed2")
 
 file.no <- seq(1,2400, by=1)
 L <- length(file.no)
