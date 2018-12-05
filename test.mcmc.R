@@ -4,18 +4,14 @@ load_all("CNPBayes_trios")
 #setwd("~/Desktop/Chakravarti_Lab/git/triostat")
 #load_all("triostat")
 library(gtools)
+library(tidyverse)
+library(ggplot2)
 
 p <- c(0.25, 0.5, 0.25)
 theta <- c(-3,0.15, 1.2)
 sigma2 <- c(0.1, 0.2, 0.2)
 N <- 30
 params <- data.frame(cbind(p, theta, sigma2))
-
-truth.plot <- data.frame(truth$data$log_ratio, as.factor(truth$data$copy_number))
-names(truth.plot) <- c("log_ratio", "copy_number")
-ggplot(truth.plot, aes(log_ratio, fill = copy_number)) +
-geom_histogram(bins=100)
-
 
 seed <- 4990917
 set.seed(seed)
@@ -52,13 +48,13 @@ colnames(genotype.df) <- c("cn.mot","cn.fat","cn.off")
 # simplifying assumption - thetas, sigmas,pis fixed
 genotype.df$mott <- thetas[(genotype.df$cn.mot+1)]
 genotype.df$fatt <- thetas[(genotype.df$cn.fat+1)]
-genotype.df$offt <- thetas[(genotype.df$cn.fat+1)]
+genotype.df$offt <- thetas[(genotype.df$cn.off+1)]
 genotype.df$mots <- sigmas[(genotype.df$cn.mot+1)]
 genotype.df$fats <- sigmas[(genotype.df$cn.fat+1)]
-genotype.df$offs <- sigmas[(genotype.df$cn.fat+1)]
+genotype.df$offs <- sigmas[(genotype.df$cn.off+1)]
 genotype.df$motp <- pis[(genotype.df$cn.mot+1)]
 genotype.df$fatp <- pis[(genotype.df$cn.fat+1)]
-genotype.df$offp <- pis[(genotype.df$cn.fat+1)]
+genotype.df$offp <- pis[(genotype.df$cn.off+1)]
 mendel <- rbinom(n=nrow(cn.df), 1, prob=0.9)
 mendel.count <- sum(mendel)
 
@@ -105,11 +101,20 @@ genotype.assign <- genotype.df[row.select,c(1:3)]
 genotype.probs <- genotype.df[,c(1:3, 13:15,16,18,20)]
 colnames(genotype.probs) <- c("cn.mum", "cn.dad", "cn.child", "A", "B", "C", "D", "E", "G")
 
+genotype.probs$abc <- genotype.probs$A*genotype.probs$B*genotype.probs$C
 # the probability for genotype 2,1,1
 genotype.probs[23,9]
 
 # the probability for genotype 2,1,0
 genotype.probs[22,9]
+
+mat <- unite(genotype.probs, "m,f", c("cn.mum", "cn.dad"), sep=",") %>%
+  unite("m,f,o", c("m,f", "cn.child"), sep=",") %>%
+  as.tibble %>%
+  mutate(`m,f,o`=factor(`m,f,o`))
+ggplot(mat, aes(`m,f,o`, abc)) +
+  geom_point()
+ggsave("joint_prob.pdf", width=12, height=6)
 
 ###############################
 ###below is test gibbs sampler
