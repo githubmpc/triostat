@@ -31,18 +31,14 @@ truth <- simulate_data_multi2(params, N=N,
                                             length.out = 3*N),
                               error=0, mprob, maplabel)
 
-#mp <- McmcParams(iter=4000, burnin=4000, thin=1, nStarts=3)
-
-#tbm.init <- TBM(triodata=truth$data,
-#            mprob=mprob,
-#            maplabel=maplabel)
-
+# for simplicity, we are using the true parameters of
+# theta, sigma and pi in calculating our probabilities
 true.stats <- component_stats(truth$data)
 thetas <- true.stats$mean
 sigmas <- true.stats$sd
 pis <- true.stats$p
 
-# check the two CN combinations we are interested in exists
+# check the two CN combinations we are interested in exists in our simulate data
 # CN2,1,0 and CN 2,1,1
 cn.df <- data.frame(matrix(ncol=3, data=truth$data$copy_number))
 # row 5 and 6 has 2,1,1 and 1,2,1
@@ -71,16 +67,27 @@ inten.mat <- data.frame(matrix(ncol=3, data=truth$data$log_ratio))
 colnames(inten.mat) <- c("cmot", "cfat", "coff")
 
 # compare row 5 vs 29
+# We use simulated LRR data from above to generate our probability table
 inten.mat1 <- inten.mat[5,]
 inten.mat2 <- inten.mat[29,]
 
-# test mcmc loop
-genotype.df$cmot.dens <- dnorm(inten.mat2$cmot, mean=genotype.df$mott, sd=(genotype.df$mots)^0.5)
-genotype.df$cfat.dens <- dnorm(inten.mat2$cfat, mean=genotype.df$fatt, sd=(genotype.df$fats)^0.5)
-genotype.df$coff.dens <- dnorm(inten.mat2$coff, mean=genotype.df$offt, sd=(genotype.df$offs)^0.5)
+# we use inten.mat2 which is -0.155, 0.263 and -2.54 for
+# mum, dad and child respectively
+# substitute any other values into inten.mat3 to run other values
+inten.mat3 <- inten.mat2
+#inten.mat3 <- inten.mat1
+
+# generate the table
+genotype.df$cmot.dens <- dnorm(inten.mat3$cmot, mean=genotype.df$mott, sd=(genotype.df$mots)^0.5)
+genotype.df$cfat.dens <- dnorm(inten.mat3$cfat, mean=genotype.df$fatt, sd=(genotype.df$fats)^0.5)
+genotype.df$coff.dens <- dnorm(inten.mat3$coff, mean=genotype.df$offt, sd=(genotype.df$offs)^0.5)
+
+# note this bit is how I am handling the Mendelian indicator
+# the counts are based off the simulated dataset above
 eta <- rbeta(1, 1+mendel.count, 1+(N-mendel.count))
 mendel <- rbinom(n=nrow(cn.df), 1, prob=eta)
 mendel.count <- sum(mendel)
+
 genotype.df$m0 <- genotype.df$motp * genotype.df$fatp * genotype.df$offp * (1-eta)
 mprob.unlist <- mprob[,c(1:3)]
 trio.prob <- c(t(mprob.unlist))
@@ -89,8 +96,24 @@ genotype.df$m1 <- genotype.df$motp * genotype.df$fatp * genotype.df$tp * eta
 genotype.df$nump <- genotype.df$cmot.dens * genotype.df$cfat.dens * genotype.df$coff.dens * (genotype.df$m0 + genotype.df$m1)
 geno.denom <- sum(genotype.df$nump)
 genotype.df$prob <- genotype.df$nump / geno.denom
+
+# update genotypes to the trio
 row.select <- sample(1:27, 1, prob=genotype.df$prob)
 genotype.assign <- genotype.df[row.select,c(1:3)]
+
+# relabel the table to be consistent with whiteboard
+genotype.probs <- genotype.df[,c(1:3, 13:15,16,18,20)]
+colnames(genotype.probs) <- c("cn.mum", "cn.dad", "cn.child", "A", "B", "C", "D", "E", "G")
+
+# the probability for genotype 2,1,1
+genotype.probs[23,9]
+
+# the probability for genotype 2,1,0
+genotype.probs[22,9]
+
+###############################
+###below is test gibbs sampler
+#############################
 
 # the actual MCMC - here we test inten.mat2 (CN2,1,0)
 genotype.mat <- matrix(nrow=20, ncol=3)
