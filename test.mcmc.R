@@ -92,19 +92,22 @@ trio.prob <- c(t(mprob.unlist))
 genotype.df$tp <- trio.prob
 genotype.df$mend <- genotype.df$coff.dens/trio.prob
 genotype.df$mend[is.infinite(genotype.df$mend)]<-0
-genotype.df$mend <- genotype.df$mend/sum(genotype.df$mend)
-genotype.df$m0 <- genotype.df$motp * genotype.df$fatp * genotype.df$offp * (1-genotype.df$mend)
-genotype.df$m1 <- genotype.df$motp * genotype.df$fatp * genotype.df$tp * genotype.df$mend
+genotype.df$mend.denom <- (genotype.df$mend + genotype.df$cmot.dens + genotype.df$cfat.dens)
+genotype.df$mend.num <- (genotype.df$mend * genotype.df$cmot.dens * genotype.df$cfat.dens) 
+genotype.df$m <- genotype.df$mend.num / genotype.df$mend.denom
+
+genotype.df$m0 <- genotype.df$motp * genotype.df$fatp * genotype.df$offp * (1-genotype.df$m)
+genotype.df$m1 <- genotype.df$motp * genotype.df$fatp * genotype.df$tp * genotype.df$m
 genotype.df$nump <- genotype.df$cmot.dens * genotype.df$cfat.dens * genotype.df$coff.dens * (genotype.df$m0 + genotype.df$m1)
 geno.denom <- sum(genotype.df$nump)
 genotype.df$prob <- genotype.df$nump / geno.denom
 
 # update genotypes to the trio
 row.select <- sample(1:27, 1, prob=genotype.df$prob)
-genotype.assign <- genotype.df[row.select,c(1:3)]
+genotype.assign <- as.numeric(genotype.df[row.select,c(1:3)])
 
 # relabel the table to be consistent with whiteboard
-genotype.probs <- genotype.df[,c(1:3, 13:15,16,18,20)]
+genotype.probs <- genotype.df[,c(1:3, 13:15,21,22,24)]
 colnames(genotype.probs) <- c("cn.mum", "cn.dad", "cn.child", "A", "B", "C", "D", "E", "G")
 
 genotype.probs$abc <- genotype.probs$A*genotype.probs$B*genotype.probs$C
@@ -120,7 +123,7 @@ mat <- unite(genotype.probs, "m,f", c("cn.mum", "cn.dad"), sep=",") %>%
   mutate(`m,f,o`=factor(`m,f,o`))
 ggplot(mat, aes(`m,f,o`, G)) +
   geom_point()
-ggsave("joint_prob5.pdf", width=12, height=6)
+ggsave("joint_prob6.pdf", width=12, height=6)
 
 ###############################
 ###below is test gibbs sampler
@@ -128,32 +131,37 @@ ggsave("joint_prob5.pdf", width=12, height=6)
 
 # the actual MCMC - here we test inten.mat2 (CN2,1,0)
 genotype.mat <- matrix(nrow=20, ncol=3)
-genotype.211 <- vector(length=20)
-genotype.210 <- vector(length=20)
+genotype.true <- vector(length=20)
+genotype.mend <- vector(length=20)
 
 for (i in 1:20){
   
   genotype.df$cmot.dens <- dnorm(inten.mat2$cmot, mean=genotype.df$mott, sd=(genotype.df$mots)^0.5)
   genotype.df$cfat.dens <- dnorm(inten.mat2$cfat, mean=genotype.df$fatt, sd=(genotype.df$fats)^0.5)
   genotype.df$coff.dens <- dnorm(inten.mat2$coff, mean=genotype.df$offt, sd=(genotype.df$offs)^0.5)
-  eta <- rbeta(1, 1+mendel.count, 1+(N-mendel.count))
-  mendel <- rbinom(n=nrow(cn.df), 1, prob=eta)
-  mendel.count <- sum(mendel)
-  genotype.df$m0 <- genotype.df$motp * genotype.df$fatp * genotype.df$offp * (1-eta)
   mprob.unlist <- mprob[,c(1:3)]
   trio.prob <- c(t(mprob.unlist))
   genotype.df$tp <- trio.prob
-  genotype.df$m1 <- genotype.df$motp * genotype.df$fatp * genotype.df$tp * eta
+  genotype.df$mend <- genotype.df$coff.dens/trio.prob
+  genotype.df$mend[is.infinite(genotype.df$mend)]<-0
+  genotype.df$mend.denom <- (genotype.df$mend + genotype.df$cmot.dens + genotype.df$cfat.dens)
+  genotype.df$mend.num <- (genotype.df$mend * genotype.df$cmot.dens * genotype.df$cfat.dens) 
+  genotype.df$m <- genotype.df$mend.num / genotype.df$mend.denom
+  
+  genotype.df$m0 <- genotype.df$motp * genotype.df$fatp * genotype.df$offp * (1-genotype.df$m)
+  genotype.df$m1 <- genotype.df$motp * genotype.df$fatp * genotype.df$tp * genotype.df$m
   genotype.df$nump <- genotype.df$cmot.dens * genotype.df$cfat.dens * genotype.df$coff.dens * (genotype.df$m0 + genotype.df$m1)
   geno.denom <- sum(genotype.df$nump)
   genotype.df$prob <- genotype.df$nump / geno.denom
+  
+  # update genotypes to the trio
   row.select <- sample(1:27, 1, prob=genotype.df$prob)
   genotype.assign <- as.numeric(genotype.df[row.select,c(1:3)])
   
   genotype.mat[i,] <- genotype.assign
-  genotype.210[i] <- genotype.df$prob[22]
-  genotype.211[i] <- genotype.df$prob[23]
+  genotype.mend[i] <- genotype.df$prob[13]
+  genotype.true[i] <- genotype.df$prob[16]
 }
 
-mean(genotype.210)
-mean(genotype.211)
+mean(genotype.mend)
+mean(genotype.true)
