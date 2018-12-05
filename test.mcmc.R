@@ -65,7 +65,7 @@ colnames(inten.mat) <- c("cmot", "cfat", "coff")
 # compare row 5 vs 29
 # We use simulated LRR data from above to generate our probability table
 inten.mat1 <- inten.mat[5,]
-inten.mat2 <- inten.mat[29,]
+inten.mat2 <- inten.mat[18,]
 
 # we use inten.mat2 which is -0.155, 0.263 and -2.54 for
 # mum, dad and child respectively
@@ -84,11 +84,17 @@ eta <- rbeta(1, 1+mendel.count, 1+(N-mendel.count))
 mendel <- rbinom(n=nrow(cn.df), 1, prob=eta)
 mendel.count <- sum(mendel)
 
-genotype.df$m0 <- genotype.df$motp * genotype.df$fatp * genotype.df$offp * (1-eta)
+#fix eta
+eta <-1
+
 mprob.unlist <- mprob[,c(1:3)]
 trio.prob <- c(t(mprob.unlist))
 genotype.df$tp <- trio.prob
-genotype.df$m1 <- genotype.df$motp * genotype.df$fatp * genotype.df$tp * eta
+genotype.df$mend <- genotype.df$coff.dens/trio.prob
+genotype.df$mend[is.infinite(genotype.df$mend)]<-0
+genotype.df$mend <- genotype.df$mend/sum(genotype.df$mend)
+genotype.df$m0 <- genotype.df$motp * genotype.df$fatp * genotype.df$offp * (1-genotype.df$mend)
+genotype.df$m1 <- genotype.df$motp * genotype.df$fatp * genotype.df$tp * genotype.df$mend
 genotype.df$nump <- genotype.df$cmot.dens * genotype.df$cfat.dens * genotype.df$coff.dens * (genotype.df$m0 + genotype.df$m1)
 geno.denom <- sum(genotype.df$nump)
 genotype.df$prob <- genotype.df$nump / geno.denom
@@ -112,9 +118,9 @@ mat <- unite(genotype.probs, "m,f", c("cn.mum", "cn.dad"), sep=",") %>%
   unite("m,f,o", c("m,f", "cn.child"), sep=",") %>%
   as.tibble %>%
   mutate(`m,f,o`=factor(`m,f,o`))
-ggplot(mat, aes(`m,f,o`, abc)) +
+ggplot(mat, aes(`m,f,o`, G)) +
   geom_point()
-ggsave("joint_prob.pdf", width=12, height=6)
+ggsave("joint_prob5.pdf", width=12, height=6)
 
 ###############################
 ###below is test gibbs sampler
